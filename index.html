@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>利润率自动计算器</title>
+  <style>
+    :root{color-scheme:light;--bg:#f4f5f7;--panel:#fff;--ink:#17191c;--muted:#686d76;--line:#dfe2e7;--accent:#176b52;--accent2:#e7f3ee;--danger:#a93f3f;--head:#242a31}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,"Microsoft YaHei",sans-serif;letter-spacing:0}.app{min-height:100vh}.top{background:var(--head);color:#fff;padding:18px 24px}.top h1{font-size:20px;margin:0;font-weight:600}.top p{color:#cbd0d6;margin:4px 0 0}.band{background:var(--panel);border-bottom:1px solid var(--line);padding:14px 24px}.controls{display:grid;grid-template-columns:repeat(4,minmax(130px,180px)) 1fr;gap:12px;align-items:end;max-width:1500px;margin:auto}.field label{display:block;color:var(--muted);font-size:12px;margin-bottom:4px}.field input{width:100%;height:36px;border:1px solid var(--line);border-radius:4px;padding:0 9px;background:#fff;color:var(--ink);font:inherit}.actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}button{height:36px;border:1px solid var(--line);border-radius:4px;background:#fff;color:var(--ink);padding:0 12px;font:inherit;cursor:pointer}button.primary{background:var(--accent);border-color:var(--accent);color:#fff}button.icon{width:34px;padding:0;font-size:18px}main{padding:18px 24px 32px;max-width:1600px;margin:auto}.summary{display:grid;grid-template-columns:repeat(3,minmax(160px,240px));gap:12px;margin-bottom:16px}.metric{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px}.metric span{display:block;color:var(--muted);font-size:12px}.metric strong{font-size:22px;font-weight:600}.table-wrap{overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:6px}table{width:100%;border-collapse:collapse;min-width:1480px}th,td{padding:9px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}th{position:sticky;top:0;background:#f0f2f4;color:#3d424a;font-weight:600;font-size:12px;z-index:1}th:first-child,td:first-child,th:nth-child(2),td:nth-child(2){text-align:left}td input{width:92px;height:31px;border:1px solid transparent;border-radius:3px;padding:0 6px;text-align:right;font:inherit;background:transparent}td:first-child input{width:130px;text-align:left}td input:focus{outline:2px solid #8ab7a8;border-color:transparent;background:#fff}.rate{font-variant-numeric:tabular-nums}.positive{color:var(--accent);font-weight:600}.negative{color:var(--danger);font-weight:600}.formula{color:var(--muted);margin:12px 2px 0;font-size:12px}.empty{text-align:center!important;color:var(--muted);padding:34px!important}@media(max-width:800px){.top,.band,main{padding-left:12px;padding-right:12px}.controls{grid-template-columns:repeat(2,minmax(0,1fr))}.actions{grid-column:1/-1;justify-content:flex-start}.summary{grid-template-columns:1fr}.top p{font-size:12px}}
+  </style>
+</head>
+<body>
+<div class="app">
+  <header class="top"><h1>利润率自动计算器</h1><p>按实际成交收入计算毛利、纯利与达人抽佣利润率</p></header>
+  <section class="band"><div class="controls">
+    <div class="field"><label for="returnRate">退货率（%）</label><input id="returnRate" type="number" min="0" max="100" step="1" value="30"></div>
+    <div class="field"><label for="insurance">每单运费险（元）</label><input id="insurance" type="number" min="0" step="0.01" value="3"></div>
+    <div class="field"><label for="shipping">发货快递（元）</label><input id="shipping" type="number" min="0" step="0.01" value="3"></div>
+    <div class="field"><label for="returnShipping">退货快递（元）</label><input id="returnShipping" type="number" min="0" step="0.01" value="3"></div>
+    <div class="actions"><button id="reset">清空数据</button><button id="export">导出 CSV</button><button id="add" class="primary">＋ 添加产品</button></div>
+  </div></section>
+  <main>
+    <div class="summary"><div class="metric"><span>产品数</span><strong id="count">0</strong></div><div class="metric"><span>平均毛利率</span><strong id="avgGross">0%</strong></div><div class="metric"><span>平均未抽佣纯利率</span><strong id="avgNet">0%</strong></div></div>
+    <div class="table-wrap"><table><thead><tr><th>产品</th><th>售价</th><th>产品成本</th><th>毛利</th><th>毛利率</th><th>分摊运费险</th><th>分摊发货快递</th><th>分摊退货快递</th><th>未抽佣纯利</th><th>未抽佣纯利率</th><th>10%纯利率</th><th>15%纯利率</th><th>20%纯利率</th><th>25%纯利率</th><th>30%纯利率</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+    <p class="formula">毛利率 =（售价－产品成本）÷ 售价；纯利率 =（售价－产品成本－分摊运费险－分摊发货快递－分摊退货快递－达人佣金）÷ 售价。</p>
+  </main>
+</div>
+<script>
+const $=id=>document.getElementById(id), fields=['returnRate','insurance','shipping','returnShipping'];
+let products=load()?.products||[]; const saved=load(); if(saved?.settings) fields.forEach(k=>$(k).value=saved.settings[k]);
+function load(){try{return JSON.parse(localStorage.getItem('profit-calculator-tool-v2'))}catch{return null}}
+function n(v){return Number(v)||0} function money(v){return v.toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2})} function pct(v){return (v*100).toFixed(2)+'%'}
+function settings(){return Object.fromEntries(fields.map(k=>[k,n($(k).value)]))}
+function calc(p){const s=settings(),keep=Math.max(0.000001,1-s.returnRate/100), gross=p.price-p.cost, grossRate=p.price?gross/p.price:0; const ins=s.insurance/keep, ship=s.shipping/keep, ret=s.returnShipping*(s.returnRate/100)/keep; const net=gross-ins-ship-ret; return{gross,grossRate,ins,ship,ret,net,netRate:p.price?net/p.price:0,rates:[.1,.15,.2,.25,.3].map(r=>p.price?(net-p.price*r)/p.price:0)}}
+function save(){localStorage.setItem('profit-calculator-tool-v2',JSON.stringify({products,settings:settings()}))}
+function render(){const body=$('rows');body.innerHTML='';if(!products.length){body.innerHTML='<tr><td class="empty" colspan="16">暂无产品，点击“添加产品”开始计算</td></tr>'}products.forEach((p,i)=>{const c=calc(p),tr=document.createElement('tr');tr.innerHTML=`<td><input data-i="${i}" data-k="name" value="${esc(p.name)}" placeholder="产品名称"></td><td><input type="number" min="0" step="0.01" data-i="${i}" data-k="price" value="${p.price}"></td><td><input type="number" min="0" step="0.01" data-i="${i}" data-k="cost" value="${p.cost}"></td><td>${money(c.gross)}</td><td class="rate ${c.grossRate>=0?'positive':'negative'}">${pct(c.grossRate)}</td><td>${money(c.ins)}</td><td>${money(c.ship)}</td><td>${money(c.ret)}</td><td>${money(c.net)}</td><td class="rate ${c.netRate>=0?'positive':'negative'}">${pct(c.netRate)}</td>${c.rates.map(v=>`<td class="rate ${v>=0?'positive':'negative'}">${pct(v)}</td>`).join('')}<td><button class="icon" data-remove="${i}" aria-label="删除">×</button></td>`;body.appendChild(tr)});const cs=products.map(calc);$('count').textContent=products.length;$('avgGross').textContent=pct(cs.length?cs.reduce((a,c)=>a+c.grossRate,0)/cs.length:0);$('avgNet').textContent=pct(cs.length?cs.reduce((a,c)=>a+c.netRate,0)/cs.length:0);save()}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+$('rows').addEventListener('change',e=>{const i=e.target.dataset.i,k=e.target.dataset.k;if(k){products[i][k]=k==='name'?e.target.value:n(e.target.value);render()}});$('rows').addEventListener('click',e=>{if(e.target.dataset.remove!==undefined){products.splice(Number(e.target.dataset.remove),1);render()}});fields.forEach(k=>$(k).addEventListener('change',render));
+$('add').onclick=()=>{products.push({name:'',price:0,cost:0});render();setTimeout(()=>document.querySelector(`input[data-i="${products.length-1}"][data-k="name"]`).focus())};$('reset').onclick=()=>{if(confirm('确定清空当前浏览器中保存的全部产品数据？')){products=[];localStorage.removeItem('profit-calculator-tool-v2');render()}};
+$('export').onclick=()=>{const head=['产品','售价','产品成本','毛利','毛利率','分摊运费险','分摊发货快递','分摊退货快递','未抽佣纯利','未抽佣纯利率','10%纯利率','15%纯利率','20%纯利率','25%纯利率','30%纯利率'];const data=[head,...products.map(p=>{const c=calc(p);return[p.name,p.price,p.cost,c.gross,pct(c.grossRate),c.ins,c.ship,c.ret,c.net,pct(c.netRate),...c.rates.map(pct)]})];const csv='\ufeff'+data.map(r=>r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(',')).join('\r\n');const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='利润率测算结果.csv';a.click();URL.revokeObjectURL(a.href)};render();
+</script>
+</body>
+</html>
